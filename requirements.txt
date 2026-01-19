@@ -8,3 +8,4 @@ scikit-learn
 gunicorn
 flask-cors
 requests
+opencv-python
