@@ -7,6 +7,7 @@ import cv2
 import pillow_heif
 import base64
 from io import BytesIO
+import os
 
 # ---------------- CONFIG ----------------
 LOCAL_MODEL_PATH = "./model"
@@ -16,13 +17,24 @@ AI_THRESHOLD = 0.60
 REAL_THRESHOLD = 0.60
 BLUR_THRESHOLD = 140.0
 
+# limit upload size (prevents GitHub/Render crash)
+MAX_FILE_SIZE_MB = 25
+
 # --------------------------------------
 app = Flask(__name__)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE_MB * 1024 * 1024
+
+device = torch.device("cpu")  # Render uses CPU only
+
+# ---------------- HEIC FIX ----------------
+pillow_heif.register_heif_opener()
 
 # ---------------- LOAD MODEL ----------------
 processor = AutoProcessor.from_pretrained(LOCAL_MODEL_PATH)
-model = AutoModelForImageClassification.from_pretrained(LOCAL_MODEL_PATH).to(device)
+model = AutoModelForImageClassification.from_pretrained(
+    LOCAL_MODEL_PATH,
+    torch_dtype=torch.float32
+).to(device)
 model.eval()
 
 # ---------------- HELPERS ----------------
@@ -42,7 +54,7 @@ def blur_score(img):
 
 def looks_like_ai_art(img):
     arr = np.array(img)
-    color_std = np.std(arr, axis=(0,1)).mean()
+    color_std = np.std(arr, axis=(0, 1)).mean()
     gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
     edges = cv2.Canny(gray, 100, 200)
     edge_density = edges.mean()
@@ -52,14 +64,16 @@ def looks_like_ai_art(img):
 
 def make_preview(img):
     buf = BytesIO()
-    img.save(buf, format="JPEG", quality=90)
+    img.save(buf, format="JPEG", quality=85)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 # ---------------- CORE LOGIC ----------------
 def predict_image(img):
     img = resize_image(img)
 
-    inputs = processor(images=img, return_tensors="pt").to(device)
+    inputs = processor(images=img, return_tensors="pt")
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
     with torch.no_grad():
         logits = model(**inputs).logits
         probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
@@ -99,14 +113,20 @@ def predict_image(img):
 def index():
     if request.method == "POST":
         file = request.files.get("file")
-        if not file or not allowed_file(file.filename):
-            return jsonify({"error": "Invalid file"})
 
-        if file.filename.lower().endswith(".heic"):
-            heif = pillow_heif.read_heif(file.read())
-            img = Image.frombytes(heif.mode, heif.size, heif.data).convert("RGB")
-        else:
-            img = Image.open(file).convert("RGB")
+        if not file or not allowed_file(file.filename):
+            return jsonify({"error": "Invalid file type"})
+
+        try:
+            if file.filename.lower().endswith(".heic"):
+                heif = pillow_heif.read_heif(file.read())
+                img = Image.frombytes(
+                    heif.mode, heif.size, heif.data
+                ).convert("RGB")
+            else:
+                img = Image.open(file).convert("RGB")
+        except Exception:
+            return jsonify({"error": "Image decoding failed"})
 
         result = predict_image(img)
         result["preview"] = make_preview(img)
@@ -114,8 +134,7 @@ def index():
 
     return render_template("index.html")
 
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
