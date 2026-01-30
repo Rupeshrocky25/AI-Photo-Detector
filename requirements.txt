@@ -1,6 +1,7 @@
 flask==3.0.0
 torch==2.10.0
 transformers==4.36.2
+safetensors
 numpy
 opencv-python-headless
 pillow
