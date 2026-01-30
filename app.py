@@ -82,7 +82,9 @@ def predict_image(img):
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     with torch.no_grad():
-        logits = model(**inputs).logits
+        mdl = get_model()
+        logits = mdl(**inputs).logits
+
         probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
 
     real_prob = ai_prob = 0.0
