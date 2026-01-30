@@ -32,13 +32,18 @@ pillow_heif.register_heif_opener()
 # ---------------- LOAD MODEL FROM HUGGING FACE ----------------
 processor = AutoProcessor.from_pretrained(HF_MODEL_ID)
 
-model = AutoModelForImageClassification.from_pretrained(
-    HF_MODEL_ID,
-    torch_dtype=torch.float32,
-    use_safetensors=True
-).to(device)
+model = None
 
-model.eval()
+def get_model():
+    global model
+    if model is None:
+        model = AutoModelForImageClassification.from_pretrained(
+            HF_MODEL_ID,
+            torch_dtype=torch.float32,
+            low_cpu_mem_usage=True
+        ).to(device)
+        model.eval()
+    return model
 
 # ---------------- HELPERS ----------------
 def allowed_file(filename):
