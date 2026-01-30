@@ -1,4 +1,6 @@
 __pycache__/
 *.pyc
 .env
-model/*.safetensors
+.venv
+venv/
+model/model.safetensors

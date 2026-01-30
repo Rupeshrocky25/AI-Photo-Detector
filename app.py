@@ -17,24 +17,39 @@ AI_THRESHOLD = 0.60
 REAL_THRESHOLD = 0.60
 BLUR_THRESHOLD = 140.0
 
-# limit upload size (prevents GitHub/Render crash)
-MAX_FILE_SIZE_MB = 25
+MAX_FILE_SIZE_MB = 25  # limit upload size
 
-# --------------------------------------
+# ---------------- FLASK ----------------
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE_MB * 1024 * 1024
 
-device = torch.device("cpu")  # Render uses CPU only
+device = torch.device("cpu")  # CPU only
 
-# ---------------- HEIC FIX ----------------
+# ---------------- HEIC SUPPORT ----------------
 pillow_heif.register_heif_opener()
 
 # ---------------- LOAD MODEL ----------------
 processor = AutoProcessor.from_pretrained(LOCAL_MODEL_PATH)
-model = AutoModelForImageClassification.from_pretrained(
-    LOCAL_MODEL_PATH,
-    torch_dtype=torch.float32
-).to(device)
+
+# Check if safetensors exists, else use .bin
+model_file_bin = os.path.join(LOCAL_MODEL_PATH, "pytorch_model.bin")
+model_file_safe = os.path.join(LOCAL_MODEL_PATH, "model.safetensors")
+
+if os.path.exists(model_file_safe):
+    model = AutoModelForImageClassification.from_pretrained(
+        LOCAL_MODEL_PATH,
+        torch_dtype=torch.float32,
+    ).to(device)
+elif os.path.exists(model_file_bin):
+    model = AutoModelForImageClassification.from_pretrained(
+        LOCAL_MODEL_PATH,
+        torch_dtype=torch.float32
+    ).to(device)
+else:
+    raise FileNotFoundError(
+        "No model weights found in './model'. Add pytorch_model.bin or model.safetensors"
+    )
+
 model.eval()
 
 # ---------------- HELPERS ----------------
@@ -59,7 +74,6 @@ def looks_like_ai_art(img):
     edges = cv2.Canny(gray, 100, 200)
     edge_density = edges.mean()
     blur = blur_score(img)
-
     return color_std < 45 and edge_density > 0.07 and blur < 180
 
 def make_preview(img):
@@ -70,7 +84,6 @@ def make_preview(img):
 # ---------------- CORE LOGIC ----------------
 def predict_image(img):
     img = resize_image(img)
-
     inputs = processor(images=img, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
@@ -108,21 +121,18 @@ def predict_image(img):
         "oversmoothed": oversmoothed
     }
 
-# ---------------- ROUTE ----------------
+# ---------------- ROUTES ----------------
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         file = request.files.get("file")
-
         if not file or not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type"})
 
         try:
             if file.filename.lower().endswith(".heic"):
                 heif = pillow_heif.read_heif(file.read())
-                img = Image.frombytes(
-                    heif.mode, heif.size, heif.data
-                ).convert("RGB")
+                img = Image.frombytes(heif.mode, heif.size, heif.data).convert("RGB")
             else:
                 img = Image.open(file).convert("RGB")
         except Exception:
