@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.env
 .env
-.venv
-venv/
-model/model.safetensors
+*.ipynb_checkpoints
+*.DS_Store
+model/
