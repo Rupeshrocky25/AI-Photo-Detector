@@ -10,7 +10,6 @@ from io import BytesIO
 import os
 
 # ---------------- CONFIG ----------------
-LOCAL_MODEL_PATH = "./model"
 HF_MODEL_ID = "rupesh22222/aiphotodetector_safetensormodel"
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "heic"}
@@ -19,27 +18,24 @@ AI_THRESHOLD = 0.60
 REAL_THRESHOLD = 0.60
 BLUR_THRESHOLD = 140.0
 
-MAX_FILE_SIZE_MB = 25  # limit upload size
+MAX_FILE_SIZE_MB = 25  # upload limit
 
 # ---------------- FLASK ----------------
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE_MB * 1024 * 1024
 
-device = torch.device("cpu")  # CPU only
+device = torch.device("cpu")  # Render = CPU only
 
 # ---------------- HEIC SUPPORT ----------------
 pillow_heif.register_heif_opener()
 
-# ---------------- LOAD MODEL ----------------
-processor = AutoProcessor.from_pretrained(LOCAL_MODEL_PATH)
-
-# Check if safetensors exists, else use .bin
-# ---------------- LOAD MODEL ----------------
-processor = AutoProcessor.from_pretrained(LOCAL_MODEL_PATH)
+# ---------------- LOAD MODEL FROM HUGGING FACE ----------------
+processor = AutoProcessor.from_pretrained(HF_MODEL_ID)
 
 model = AutoModelForImageClassification.from_pretrained(
     HF_MODEL_ID,
-    torch_dtype=torch.float32
+    torch_dtype=torch.float32,
+    use_safetensors=True
 ).to(device)
 
 model.eval()
@@ -76,6 +72,7 @@ def make_preview(img):
 # ---------------- CORE LOGIC ----------------
 def predict_image(img):
     img = resize_image(img)
+
     inputs = processor(images=img, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
@@ -118,13 +115,16 @@ def predict_image(img):
 def index():
     if request.method == "POST":
         file = request.files.get("file")
+
         if not file or not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type"})
 
         try:
             if file.filename.lower().endswith(".heic"):
                 heif = pillow_heif.read_heif(file.read())
-                img = Image.frombytes(heif.mode, heif.size, heif.data).convert("RGB")
+                img = Image.frombytes(
+                    heif.mode, heif.size, heif.data
+                ).convert("RGB")
             else:
                 img = Image.open(file).convert("RGB")
         except Exception:
