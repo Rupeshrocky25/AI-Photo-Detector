@@ -41,9 +41,11 @@ def get_model():
             HF_MODEL_ID,
             torch_dtype=torch.float32,
             low_cpu_mem_usage=True
-        ).to(device)
+        )
+        model.to(device)
         model.eval()
     return model
+
 
 # ---------------- HELPERS ----------------
 def allowed_file(filename):
