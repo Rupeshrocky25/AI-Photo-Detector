@@ -34,23 +34,13 @@ pillow_heif.register_heif_opener()
 processor = AutoProcessor.from_pretrained(LOCAL_MODEL_PATH)
 
 # Check if safetensors exists, else use .bin
-model_file_bin = os.path.join(LOCAL_MODEL_PATH, "pytorch_model.bin")
-model_file_safe = os.path.join(LOCAL_MODEL_PATH, "model.safetensors")
+# ---------------- LOAD MODEL ----------------
+processor = AutoProcessor.from_pretrained(LOCAL_MODEL_PATH)
 
-if os.path.exists(model_file_safe):
-    model = AutoModelForImageClassification.from_pretrained(
-        LOCAL_MODEL_PATH,
-        torch_dtype=torch.float32,
-    ).to(device)
-elif os.path.exists(model_file_bin):
-    model = AutoModelForImageClassification.from_pretrained(
-        LOCAL_MODEL_PATH,
-        torch_dtype=torch.float32
-    ).to(device)
-else:
-    raise FileNotFoundError(
-        "No model weights found in './model'. Add pytorch_model.bin or model.safetensors"
-    )
+model = AutoModelForImageClassification.from_pretrained(
+    HF_MODEL_ID,
+    torch_dtype=torch.float32
+).to(device)
 
 model.eval()
 
