@@ -11,6 +11,8 @@ import os
 
 # ---------------- CONFIG ----------------
 LOCAL_MODEL_PATH = "./model"
+HF_MODEL_ID = "rupesh22222/aiphotodetector_safetensormodel"
+
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "heic"}
 
 AI_THRESHOLD = 0.60
