@@ -90,7 +90,8 @@ def predict_image(img):
         probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
 
     real_prob = ai_prob = 0.0
-    for idx, label in model.config.id2label.items():
+     mdl = get_model()
+     for idx, label in mdl.config.id2label.items():
         lname = label.lower()
         if "real" in lname:
             real_prob = float(probs[idx])
