@@ -29,9 +29,10 @@ device = torch.device("cpu")  # Render = CPU only
 # ---------------- HEIC SUPPORT ----------------
 pillow_heif.register_heif_opener()
 
-# ---------------- LOAD MODEL FROM HUGGING FACE ----------------
+# ---------------- LOAD PROCESSOR ----------------
 processor = AutoProcessor.from_pretrained(HF_MODEL_ID)
 
+# ---------------- LAZY MODEL LOAD ----------------
 model = None
 
 def get_model():
@@ -45,7 +46,6 @@ def get_model():
         model.to(device)
         model.eval()
     return model
-
 
 # ---------------- HELPERS ----------------
 def allowed_file(filename):
@@ -83,15 +83,16 @@ def predict_image(img):
     inputs = processor(images=img, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
-   with torch.no_grad():
     mdl = get_model()
-    logits = mdl(**inputs).logits
 
+    with torch.no_grad():
+        logits = mdl(**inputs).logits
         probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
 
-    real_prob = ai_prob = 0.0
-     mdl = get_model()
-     for idx, label in mdl.config.id2label.items():
+    real_prob = 0.0
+    ai_prob = 0.0
+
+    for idx, label in mdl.config.id2label.items():
         lname = label.lower()
         if "real" in lname:
             real_prob = float(probs[idx])
@@ -110,16 +111,16 @@ def predict_image(img):
     else:
         label = "AI" if oversmoothed else "Real"
 
-   return {
-    "label": label,
-    "probabilities": {
-        "AI": round(ai_prob, 3),
-        "Real": round(real_prob, 3)
-    },
-    "blur_score": round(blur, 2),
-    "oversmoothed": oversmoothed,
-    "metadata_found": False
-}
+    return {
+        "label": label,
+        "probabilities": {
+            "AI": round(ai_prob, 3),
+            "Real": round(real_prob, 3)
+        },
+        "blur_score": round(blur, 2),
+        "oversmoothed": oversmoothed,
+        "metadata_found": False
+    }
 
 # ---------------- ROUTES ----------------
 @app.route("/", methods=["GET", "POST"])
