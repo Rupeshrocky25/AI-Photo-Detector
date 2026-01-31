@@ -110,7 +110,7 @@ def predict_image(img):
     else:
         label = "AI" if oversmoothed else "Real"
 
-    return {
+   return {
     "label": label,
     "probabilities": {
         "AI": round(ai_prob, 3),
@@ -118,8 +118,8 @@ def predict_image(img):
     },
     "blur_score": round(blur, 2),
     "oversmoothed": oversmoothed,
-    "metadata_found": False   # ✅ ADD THIS
-   }
+    "metadata_found": False
+}
 
 # ---------------- ROUTES ----------------
 @app.route("/", methods=["GET", "POST"])
