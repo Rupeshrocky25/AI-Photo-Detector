@@ -83,9 +83,9 @@ def predict_image(img):
     inputs = processor(images=img, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
-    with torch.no_grad():
-        mdl = get_model()
-        logits = mdl(**inputs).logits
+   with torch.no_grad():
+    mdl = get_model()
+    logits = mdl(**inputs).logits
 
         probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
 
