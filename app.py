@@ -40,8 +40,7 @@ def get_model():
     if model is None:
         model = AutoModelForImageClassification.from_pretrained(
             HF_MODEL_ID,
-            torch_dtype=torch.float32,
-            low_cpu_mem_usage=True
+            torch_dtype=torch.float32
         )
         model.to(device)
         model.eval()
