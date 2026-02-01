@@ -1,0 +1,8 @@
+flask>=2.3
+gunicorn
+torch
+transformers
+numpy
+opencv-python-headless
+pillow
+pillow-heif

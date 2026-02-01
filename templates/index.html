@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Photo Detector</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%233085ff'/%3E%3Ctext x='50%25' y='55%25' font-size='12' text-anchor='middle' fill='white'%3EAI%3C/text%3E%3C/svg%3E">
+</head>
+
+<body>
+<main class="app">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="brand">
+      <h1>AI Photo Detector</h1>
+      <p class="subtitle">Probability + Blur based AI detection</p>
+    </div>
+  </header>
+
+  <!-- UPLOAD -->
+  <section class="u-center">
+    <div id="drop-area" class="drop-area">
+      <input
+        id="fileElem"
+        type="file"
+        name="file"
+        class="file-input"
+        accept=".jpg,.jpeg,.png,.heic,image/*"
+      />
+      <label for="fileElem" class="drop-label">
+        <strong>Drag & drop a photo</strong>
+        <div class="muted">or <span class="file-btn">browse</span> (jpg, png, jpeg, heic)</div>
+      </label>
+    </div>
+
+    <!-- PREVIEW -->
+    <div id="previewCard" class="preview-card hidden">
+      <div class="preview-left">
+        <img id="previewImg" alt="Preview" />
+      </div>
+
+      <div class="preview-right">
+        <div id="status" class="status">Ready</div>
+        <div class="actions">
+          <button id="scanBtn" class="btn primary">Scan Photo</button>
+          <button id="removeBtn" class="btn ghost">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results" class="results-card hidden">
+
+      <div class="result-header">
+        <div class="result-title">Final Result</div>
+        <div id="finalLabel" class="final-badge">—</div>
+      </div>
+
+      <div class="result-body">
+
+        <div class="result-left">
+
+          <!-- Probability Meter -->
+          <div class="meter">
+            <div class="meter-bar" id="meterBar"></div>
+            <div class="meter-labels">
+              <span id="realPct">Real 0%</span>
+              <span id="aiPct">AI 0%</span>
+            </div>
+          </div>
+
+          <!-- Meta -->
+          <ul class="meta-list">
+            <li><strong>Blur score:</strong> <span id="blurScore">—</span></li>
+            <li><strong>Oversmoothed:</strong> <span id="overSmooth">—</span></li>
+            <li><strong>Metadata found:</strong> <span id="metaFound">—</span></li>
+          </ul>
+        </div>
+
+        <div class="result-right">
+          <p class="small muted">
+            Decision logic:
+            <br>• Highest probability wins
+            <br>• Blur used only when close
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    <small>Built by Rupesh ♥</small>
+  </footer>
+
+</main>
+
+<script>
+const dropArea = document.getElementById('drop-area');
+const fileInput = document.getElementById('fileElem');
+const previewCard = document.getElementById('previewCard');
+const previewImg = document.getElementById('previewImg');
+const scanBtn = document.getElementById('scanBtn');
+const removeBtn = document.getElementById('removeBtn');
+const results = document.getElementById('results');
+
+const status = document.getElementById('status');
+const finalLabel = document.getElementById('finalLabel');
+const meterBar = document.getElementById('meterBar');
+const realPct = document.getElementById('realPct');
+const aiPct = document.getElementById('aiPct');
+const blurScore = document.getElementById('blurScore');
+const metaFound = document.getElementById('metaFound');
+const overSmooth = document.getElementById('overSmooth');
+
+let currentFile = null;
+
+/* Drag & drop */
+['dragenter','dragover','dragleave','drop'].forEach(e =>
+  dropArea.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); })
+);
+
+dropArea.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]));
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+document.querySelector('.file-btn').onclick = () => fileInput.click();
+
+function handleFile(file){
+  if(!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(!['jpg','jpeg','png','heic'].includes(ext)){
+    alert('Unsupported format');
+    return;
+  }
+
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    previewImg.src = e.target.result;
+    previewCard.classList.remove('hidden');
+    results.classList.add('hidden');
+    status.textContent = 'Photo ready';
+  };
+  reader.readAsDataURL(file);
+}
+
+removeBtn.onclick = () => {
+  currentFile = null;
+  previewCard.classList.add('hidden');
+  results.classList.add('hidden');
+};
+
+scanBtn.onclick = async () => {
+  if(!currentFile) return;
+
+  status.textContent = 'Scanning...';
+  scanBtn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('file', currentFile);
+
+  try {
+    const res = await fetch('/', { method:'POST', body:fd });
+    const data = await res.json();
+
+    if(data.error){
+      status.textContent = data.error;
+      return;
+    }
+
+    const real = Math.round(data.probabilities.Real * 100);
+    const ai = Math.round(data.probabilities.AI * 100);
+
+    finalLabel.textContent = data.label;
+    realPct.textContent = `Real ${real}%`;
+    aiPct.textContent = `AI ${ai}%`;
+    meterBar.style.width = `${ai}%`;
+
+    blurScore.textContent = data.blur_score;
+    metaFound.textContent = data.metadata_found ? 'Yes' : 'No';
+    overSmooth.textContent = data.oversmoothed ? 'Yes' : 'No';
+
+    results.classList.remove('hidden');
+    status.textContent = 'Done';
+
+  } catch {
+    status.textContent = 'Server error';
+  } finally {
+    scanBtn.disabled = false;
+  }
+};
+</script>
+
+</body>
+</html>
